@@ -10,7 +10,6 @@ This module configures:
 Uses async/await for non-blocking operations and better performance.
 """
 
-import os
 from typing import AsyncGenerator, Set
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -21,29 +20,23 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import NullPool
 from sqlalchemy import text, inspect
 
-# Import Base and all models so SQLAlchemy knows about them
+# Import settings and models
+from app.core.config import settings
 from app.models.base import Base
 from app.models.database import Seller, Customer, Product, Order, OrderProduct  # noqa: F401
-
-
-# Database configuration - can be overridden by environment variables or config.py
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/insightsales"
-)
-DEBUG_MODE = os.getenv("DEBUG", "true").lower() == "true"
 
 
 # Async SQLAlchemy Engine
 # Responsible for managing connections to the database
 engine: AsyncEngine = create_async_engine(
-    DATABASE_URL,
-    echo=DEBUG_MODE,  # Log SQL queries only in debug mode
-    pool_size=5,  # Number of connections to keep in the pool
-    max_overflow=10,  # Max number of connections beyond pool_size
+    settings.DATABASE_URL,
+    echo=settings.DB_ECHO,  # Log SQL queries based on config
+    pool_size=settings.DB_POOL_SIZE,
+    max_overflow=settings.DB_MAX_OVERFLOW,
     pool_pre_ping=True,  # Test connections before using them
-    pool_recycle=3600,  # Recycle connections after 1 hour
+    pool_recycle=settings.DB_POOL_RECYCLE,
     # Use NullPool only in debug mode, otherwise use default pooling
-    poolclass=NullPool if DEBUG_MODE else None,
+    poolclass=NullPool if settings.DEBUG else None,
 )
 
 
@@ -158,7 +151,11 @@ async def test_connection() -> bool:
     except Exception as e:
         print(f"❌ Database connection failed: {e}")
         # Hide password from URL when displaying
-        safe_url = DATABASE_URL.split("@")[1] if "@" in DATABASE_URL else "unknown"
+        safe_url = (
+            settings.DATABASE_URL.split("@")[1]
+            if "@" in settings.DATABASE_URL
+            else "unknown"
+        )
         print(f"   Target: {safe_url}")
         return False
 
