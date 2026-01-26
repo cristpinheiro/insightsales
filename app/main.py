@@ -7,14 +7,8 @@ including startup/shutdown events, middleware, and routes.
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from sqlalchemy import inspect
 from app.core.config import settings
-from app.core.database import (
-    init_db,
-    close_db,
-    test_connection,
-    engine,
-)
+from app.core.database import init_db, close_db, test_connection
 from app.controller.finder import router as query_router
 
 
@@ -94,63 +88,6 @@ async def health_check():
             "url": settings.OLLAMA_BASE_URL,
             "model": settings.OLLAMA_MODEL,
         },
-    }
-
-
-@app.get("/schema")
-async def get_schema():
-    """
-    Get database schema information.
-
-    Returns all tables and their columns with types.
-    """
-    async with engine.connect() as conn:
-
-        def get_schema_info(connection):
-            inspector = inspect(connection)
-            schema = {}
-
-            for table_name in inspector.get_table_names():
-                columns = []
-                for column in inspector.get_columns(table_name):
-                    columns.append(
-                        {
-                            "name": column["name"],
-                            "type": str(column["type"]),
-                            "nullable": column["nullable"],
-                            "primary_key": column.get("primary_key", False),
-                        }
-                    )
-
-                # Get foreign keys
-                foreign_keys = []
-                for fk in inspector.get_foreign_keys(table_name):
-                    foreign_keys.append(
-                        {
-                            "column": fk["constrained_columns"][0]
-                            if fk["constrained_columns"]
-                            else None,
-                            "references": f"{fk['referred_table']}.{fk['referred_columns'][0]}"
-                            if fk["referred_columns"]
-                            else None,
-                        }
-                    )
-
-                schema[table_name] = {
-                    "columns": columns,
-                    "foreign_keys": foreign_keys,
-                }
-
-            return schema
-
-        schema_info = await conn.run_sync(get_schema_info)
-
-    return {
-        "database": settings.DATABASE_URL.split("@")[1].split("/")[1]
-        if "@" in settings.DATABASE_URL
-        else "unknown",
-        "tables": schema_info,
-        "total_tables": len(schema_info),
     }
 
 

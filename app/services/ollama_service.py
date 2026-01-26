@@ -17,17 +17,15 @@ class OllamaService:
         self.model = settings.OLLAMA_MODEL
         self.timeout = settings.OLLAMA_TIMEOUT
 
-    async def generate_sql(self, question: str, schema_context: str) -> dict:
+    async def generate_sql(self, question: str) -> dict:
         """Generate SQL query from natural language question."""
-        prompt = f"{schema_context}\n\nQuestion: {question}"
-
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
                     f"{self.base_url}/api/generate",
                     json={
                         "model": self.model,
-                        "prompt": prompt,
+                        "prompt": question,
                         "stream": False,
                     },
                 )
