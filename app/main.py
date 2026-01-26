@@ -59,8 +59,8 @@ async def root():
         "description": "Convert natural language questions to SQL queries",
         "endpoints": {
             "health": "/health",
-            "schema": "/schema",
             "query": "/api/query",
+            "docs": "/docs",
         },
     }
 
