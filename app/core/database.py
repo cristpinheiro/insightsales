@@ -17,7 +17,6 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
     async_sessionmaker,
 )
-from sqlalchemy.pool import NullPool
 from sqlalchemy import text, inspect
 
 # Import settings and models
@@ -30,13 +29,11 @@ from app.models.database import Seller, Customer, Product, Order, OrderProduct  
 # Responsible for managing connections to the database
 engine: AsyncEngine = create_async_engine(
     settings.DATABASE_URL,
-    echo=settings.DB_ECHO,  # Log SQL queries based on config
+    echo=settings.DB_ECHO,
     pool_size=settings.DB_POOL_SIZE,
     max_overflow=settings.DB_MAX_OVERFLOW,
-    pool_pre_ping=True,  # Test connections before using them
+    pool_pre_ping=True,
     pool_recycle=settings.DB_POOL_RECYCLE,
-    # Use NullPool only in debug mode, otherwise use default pooling
-    poolclass=NullPool if settings.DEBUG else None,
 )
 
 
