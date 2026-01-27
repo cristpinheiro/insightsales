@@ -58,33 +58,3 @@ class OllamaService:
                 "explanation": f"Unexpected error: {str(e)}",
                 "error": "unknown",
             }
-
-    async def explain_results(self, question: str, sql: str, results: list) -> str:
-        """Generate natural language explanation of query results."""
-        prompt = self._build_explanation_prompt(question, sql, results)
-
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(
-                    f"{self.base_url}/api/generate",
-                    json={
-                        "model": self.model,
-                        "prompt": prompt,
-                        "stream": False,
-                    },
-                )
-                response.raise_for_status()
-                result = response.json()
-
-                return result.get("response", "Could not generate explanation.")
-
-        except Exception as e:
-            return f"Error generating explanation: {str(e)}"
-
-    def _build_explanation_prompt(self, question: str, sql: str, results: list) -> str:
-        """Build prompt for result explanation."""
-        results_summary = f"Found {len(results)} result(s)"
-        if results:
-            results_summary += f": {results[:3]}"
-
-        return f"SQL Query: {sql}\nResults: {results_summary}\n\nExplain the results in relation to the question: {question}"
