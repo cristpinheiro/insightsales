@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI):
     print("\n🚀 Starting application...")
     try:
         await init_db()
+        # await init_db(force_recreate=True, auto_seed=True)
         print("✅ Application started successfully!\n")
     except Exception as e:
         print(f"❌ Failed to initialize database: {e}")

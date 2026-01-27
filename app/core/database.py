@@ -211,7 +211,7 @@ async def check_tables_exist() -> bool:
         return False
 
 
-async def init_db(force_recreate: bool = False) -> None:
+async def init_db(force_recreate: bool = False, auto_seed: bool = False) -> None:
     """
     Initialize the database: test connection and create tables if needed.
 
@@ -220,6 +220,7 @@ async def init_db(force_recreate: bool = False) -> None:
 
     Args:
         force_recreate: If True, drops and recreates all tables (DELETES ALL DATA!)
+        auto_seed: If True, populates database with sample data after creation
 
     Raises:
         Exception: If connection fails or table creation fails
@@ -230,6 +231,9 @@ async def init_db(force_recreate: bool = False) -> None:
 
         # Force recreate (DANGEROUS - deletes all data!)
         await init_db(force_recreate=True)
+
+        # Create and seed with sample data
+        await init_db(force_recreate=True, auto_seed=True)
     """
     print("=" * 60)
     print("🔍 Initializing database...")
@@ -246,6 +250,14 @@ async def init_db(force_recreate: bool = False) -> None:
         print("\n📋 Creating tables...")
         await create_tables()
         print("✅ Database initialized with fresh tables!")
+
+        # Seed if requested
+        if auto_seed:
+            from app.core.seed import seed_database
+
+            async with AsyncSessionLocal() as db:
+                await seed_database(db)
+
         return
 
     # Check if tables exist
@@ -254,6 +266,13 @@ async def init_db(force_recreate: bool = False) -> None:
     if not tables_exist:
         print("\n📋 Creating missing tables...")
         await create_tables()
+
+        # Seed if requested and tables were just created
+        if auto_seed:
+            from app.core.seed import seed_database
+
+            async with AsyncSessionLocal() as db:
+                await seed_database(db)
     else:
         print("ℹ️  All tables already exist, skipping creation")
 
