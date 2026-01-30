@@ -16,7 +16,7 @@ RULES:
 4. "order" table needs double quotes
 5. Monetary calculations: SUM(p.price * op.quantity)
 6. Always include ORDER BY and appropriate LIMIT
-7. Return ONLY SQL, no explanations
+7. Return ONLY SQL, no explanations and no comments and no extra text
 8. No DROP, DELETE, UPDATE, INSERT operations
 
 EXAMPLES:

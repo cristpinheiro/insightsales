@@ -1,103 +1,80 @@
-"""
-Main FastAPI application.
+from dotenv import load_dotenv
 
-This module creates and configures the FastAPI application,
-including startup/shutdown events, middleware, and routes.
-"""
+load_dotenv()
 
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from app.core.config import settings
-from app.core.database import init_db, close_db, test_connection
-from app.controller.finder import router as query_router
+from fastapi import FastAPI, HTTPException  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+import logging  # noqa: E402
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """
-    Application lifespan manager.
-
-    Handles startup and shutdown events:
-    - Startup: Initialize database and create tables
-    - Shutdown: Close database connections
-    """
-    # Startup
-    print("\n🚀 Starting application...")
-    try:
-        await init_db()
-        # await init_db(force_recreate=True, auto_seed=True)
-        print("✅ Application started successfully!\n")
-    except Exception as e:
-        print(f"❌ Failed to initialize database: {e}")
-        raise
-
-    yield
-
-    # Shutdown
-    print("\n🔌 Shutting down application...")
-    await close_db()
-    print("✅ Application shutdown complete\n")
+from app.schemas.schemas import QueryResponse, QueryRequest  # noqa: E402
+from app.services.nl_to_sql_service import NLToSQLService  # noqa: E402
+from app.config import DB_CONFIG, API_TITLE, API_VERSION, DEBUG  # noqa: E402
 
 
-# Create FastAPI application
-app = FastAPI(
-    title=settings.APP_NAME,
-    description="Natural Language to SQL Query System using Ollama",
-    version="1.0.0",
-    lifespan=lifespan,
+# Logging configuration
+logging.basicConfig(level=logging.INFO if not DEBUG else logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+# Initialize application
+app = FastAPI(title=API_TITLE, version=API_VERSION, debug=DEBUG)
+
+# Middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-app.include_router(query_router)
-
-
-@app.get("/")
-async def root():
-    """
-    Root endpoint - welcome message.
-    """
-    return {
-        "message": f"Welcome to {settings.APP_NAME}",
-        "description": "Convert natural language questions to SQL queries",
-        "endpoints": {
-            "health": "/health",
-            "query": "/api/query",
-            "docs": "/docs",
-        },
-    }
+# Initialize service
+nl_to_sql_service = NLToSQLService(DB_CONFIG)
 
 
 @app.get("/health")
 async def health_check():
-    """
-    Health check endpoint.
-
-    Returns application status and database connectivity.
-    """
-    db_connected = await test_connection()
-
+    """Check if API is working"""
+    db_connected = nl_to_sql_service.db_service.test_connection()
     return {
-        "status": "healthy" if db_connected else "unhealthy",
-        "app_name": settings.APP_NAME,
-        "debug": settings.DEBUG,
-        "database": {
-            "connected": db_connected,
-            "url": settings.DATABASE_URL.split("@")[1]
-            if "@" in settings.DATABASE_URL
-            else "N/A",
-        },
-        "ollama": {
-            "url": settings.OLLAMA_BASE_URL,
-            "model": settings.OLLAMA_MODEL,
-        },
+        "status": "healthy",
+        "database_connected": db_connected,
+        "debug_mode": DEBUG,
     }
+
+
+@app.post("/query", response_model=QueryResponse)
+async def process_natural_language_query(request: QueryRequest):
+    """Process natural language question and return results"""
+    try:
+        logger.info(f"Processing query: {request.question}")
+
+        sql_query, results, execution_time, retry_count, success, error_msg = (
+            nl_to_sql_service.process_query_with_retry(request.question)
+        )
+
+        if not success:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to process query after {retry_count} attempts: {error_msg}",
+            )
+
+        return QueryResponse(
+            sql_query=sql_query,
+            results=results,
+            execution_time=execution_time,
+            retry_count=retry_count,
+            success=success,
+            error_message=error_msg if not success else None,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error processing query: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=settings.DEBUG,
-    )
+    uvicorn.run(app, host="0.0.0.0", port=8000)
